@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  postiz:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: postiz-app
+    ports:
+      - "15000:5000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - NEXT_PUBLIC_BACKEND_URL=${NEXT_PUBLIC_BACKEND_URL}
+      - BACKEND_INTERNAL_URL=${BACKEND_INTERNAL_URL}
+      - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID}
+      - CLOUDFLARE_ACCESS_KEY=${CLOUDFLARE_ACCESS_KEY}
+      - CLOUDFLARE_SECRET_ACCESS_KEY=${CLOUDFLARE_SECRET_ACCESS_KEY}
+      - CLOUDFLARE_BUCKETNAME=${CLOUDFLARE_BUCKETNAME}
+      - CLOUDFLARE_BUCKET_URL=${CLOUDFLARE_BUCKET_URL}
+      - CLOUDFLARE_REGION=${CLOUDFLARE_REGION}
+      - STORAGE_PROVIDER=${STORAGE_PROVIDER:-local}
+      - UPLOAD_DIRECTORY=${UPLOAD_DIRECTORY:-/uploads}
+      - IS_GENERAL=true
+      - NX_ADD_PLUGINS=false
+    volumes:
+      - uploads:/uploads
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    networks:
+      - postiz-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: postiz-postgres
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postiz-user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postiz-password}
+      - POSTGRES_DB=${POSTGRES_DB:-postiz-db}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - postiz-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postiz-user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: postiz-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - postiz-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:
+  redis-data:
+  uploads:
+
+networks:
+  postiz-network:
+    driver: bridge
